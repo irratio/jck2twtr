@@ -96,9 +96,9 @@ class Jck2Twtr
       parse_rss.map { |item| create_tweet(item) }.each do |tweet|
         puts tweet
 
-        #if Twitter.update(tweet)
+        if Twitter.update(tweet)
           @last_post_time = DateTime.now
-        # end
+        end
       end
       sleep(@options[:checkinterval])
     end
