@@ -13,23 +13,37 @@ class Jck2Twtr
   def default_options
     {
       configfile: "config.yml",
-      checkinterval: 720
+      checkinterval: 720,
+      noreposttag: "notwi"
     }
   end
-  
+
   def initialize(options = {})
     @last_post_time = DateTime.now
 
-    @options = default_options.merge(options)
-    puts @options.inspect
+    @options = default_options
+    @options[:configfile] = options[:configfile] if options.has_key?(:configfile)
+
     config_file = YAML.load_file(@options[:configfile])
+
+    @options.merge!(config_file['main'].inject({}){|resulthash,(k,v)| resulthash[k.to_sym] = v; resulthash})
+    # reading options from config file, converting string keys to symbols in process
+
+    @options.merge!(options)
+
+    if @options.has_key?(:username) and ! @options.has_key?(:rssurl)
+      @options[:rssurl] = "http://rss.juick.com/#{@options[:username]}/blog"
+    end
+
+    @options[:checkinterval] = @options[:checkinterval].to_i
+    # just in case
 
     Twitter.configure do |config|
       config_file['twitter'].each do |key, value|
         config.instance_variable_set("@#{key}", value)
       end
     end
-    
+
     unless @options.include? :rssurl
       puts "RSS URL is not set"
       exit
@@ -39,7 +53,7 @@ class Jck2Twtr
   def parse_rss
     doc = Nokogiri::XML(open(@options[:rssurl]))
     items = doc.css('item')
-    
+
     items.map do |item|
       if DateTime.parse(item.css('pubDate').text) < @last_post_time
         nil
@@ -57,8 +71,21 @@ class Jck2Twtr
         media = (item.xpath('media:content').first || {})['url']
         text = description.xpath("//text()").to_s
         link = item.css('link').text
+        tags = []
+        item.css('category').each do |c|
+          tags << Unicode::downcase(c.text)
+        end
 
-        "#{link} #{media} #{text}"
+        text = text.split(' ').map do |w|
+          if tags.include?(Unicode::downcase(w))
+            tags.delete(Unicode::downcase(w))
+            '#' + w
+          else
+            w
+          end
+        end.join(" ")
+
+        "#{link} #{media} #{text} #{tags.map {|t| "#"+t}.join(' ')}"
       end
     end.reject(&:nil?)
   end
@@ -121,7 +148,7 @@ optparse = OptionParser.new do |opts|
   opts.on( '-u', '--juick-username USERNAME', "Username on Juick" ) do |f|
     puts f.inspect
     options[:username] = f
-    options[:rssurl] = "http://rss.juick.com/#{options[:username]}/blog"
+    #options[:rssurl] = "http://rss.juick.com/#{options[:username]}/blog"
   end
 
   opts.on( '-r', '--rss-url URL', "RSS URL to parse (default: http://rss.juick.com/USERNAME/blog)" ) do |f|
@@ -131,6 +158,20 @@ optparse = OptionParser.new do |opts|
   opts.on( '-i', '--check-interval SECONDS', "Check interval in seconds, default 720 (15 min)" ) do |f|
     options[:checkinterval] = f.to_i
   end
+
+  opts.on( '-s', '--shrtfy STRING', 'Shrtfy post text? May be "true" (default), "false" or "if-needed"' ) do |f|
+    options[:shrtfy] = f
+  end
+
+  opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "true", "false" (default) of "if-possible"') do |f|
+    options[:addhashtags] = f
+  end
+
+  opts.on( '-n', '--norepost-tag STRING', 'Special juick tag for no repost. Default: notwi') do |f|
+    options[:noreposttag] = f
+  end
+
+
 end
 
 optparse.parse!
