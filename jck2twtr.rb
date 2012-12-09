@@ -13,7 +13,7 @@ class Jck2Twtr
   def default_options
     {
       configfile: "config.yml",
-      checkinterval: 720,
+      checkinterval: 900,
       noreposttag: "notwi"
     }
   end
@@ -146,7 +146,6 @@ optparse = OptionParser.new do |opts|
   end
 
   opts.on( '-u', '--juick-username USERNAME', "Username on Juick" ) do |f|
-    puts f.inspect
     options[:username] = f
     #options[:rssurl] = "http://rss.juick.com/#{options[:username]}/blog"
   end
@@ -155,15 +154,15 @@ optparse = OptionParser.new do |opts|
     options[:rssurl] = f
   end
 
-  opts.on( '-i', '--check-interval SECONDS', "Check interval in seconds, default 720 (15 min)" ) do |f|
+  opts.on( '-i', '--check-interval SECONDS', "Check interval in seconds, default 900 (15 min)" ) do |f|
     options[:checkinterval] = f.to_i
   end
 
-  opts.on( '-s', '--shrtfy STRING', 'Shrtfy post text? May be "true" (default), "false" or "if-needed"' ) do |f|
+  opts.on( '-s', '--shrtfy STRING', 'Shrtfy post text? May be "always" (default), "never" or "if-needed"' ) do |f|
     options[:shrtfy] = f
   end
 
-  opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "true", "false" (default) of "if-possible"') do |f|
+  opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "always", "never" (default) of "if-possible"') do |f|
     options[:addhashtags] = f
   end
 
