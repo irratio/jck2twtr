@@ -14,7 +14,12 @@ class Jck2Twtr
     {
       configfile: "config.yml",
       checkinterval: 900,
-      noreposttag: "notwi"
+      noreposttags: %w(notwi),
+      addhashtags: "never",
+      notthistags: [],
+      smarthashtags: true,
+      addlink: "always",
+      shrtfy: "always"
     }
   end
 
@@ -38,6 +43,8 @@ class Jck2Twtr
     @options[:checkinterval] = @options[:checkinterval].to_i
     # just in case
 
+    @options[:smarthashtags] = false if (@options[:addhashtags] == "never")
+
     Twitter.configure do |config|
       config_file['twitter'].each do |key, value|
         config.instance_variable_set("@#{key}", value)
@@ -46,7 +53,7 @@ class Jck2Twtr
 
     unless @options.include? :rssurl
       puts "RSS URL is not set"
-      exit
+      exit 128
     end
   end
 
@@ -71,57 +78,86 @@ class Jck2Twtr
         media = (item.xpath('media:content').first || {})['url']
         text = description.xpath("//text()").to_s
         link = item.css('link').text
-        tags = []
-        item.css('category').each do |c|
-          tags << Unicode::downcase(c.text)
+
+        @tags = []
+        @tags = item.css('category').map{|c| Unicode::downcase(c.text)}
+        next unless (@tags & @options[:noreposttags]).empty?
+        @tags = @tags - @options[:notthistags]
+
+        #puts ":#{link} #{media} #{text} #{@tags.map {|t| "#"+t}.join(' ')}"
+
+        text = "#{media} #{text}"
+
+        @available_text_length = 140
+        @used_text_length = 0
+        @tweet = []
+
+        def bonus_for_hashtag_in_text(w)
+          @options[:addhashtags] == "always" ? w.length + 2 : 0
         end
 
-        text = text.split(' ').map do |w|
-          if tags.include?(Unicode::downcase(w))
-            tags.delete(Unicode::downcase(w))
-            '#' + w
+        def try_add_to_tweet(s, l=s.length)
+          return true if s == ''
+          if (@used_text_length + l) <= @available_text_length
+            @used_text_length += l + 1
+            @tweet << s
+            true
           else
-            w
+            false
           end
-        end.join(" ")
+        end
 
-        "#{link} #{media} #{text} #{tags.map {|t| "#"+t}.join(' ')}"
+        @available_text_length -= 21 if @options[:addlink] == "always"
+        @available_text_length -= @tags.inject(0){|total, t| total + t.length + 2} if @options[:addhashtags] == "always"
+        need_shrtfy_this_text = (@options[:shrtfy] == "always" || (@options[:shrtfy] == "if-needed" && text.gsub(/http[^ ]*/, 'h'*20).length > @available_text_length))
+
+        text.split(' ').each do |word|
+          became_hashtag = false
+          if word.start_with? 'http'
+            word_length = 20
+          else
+            hashtag_proto = Unicode::downcase(word.gsub(/["()«».,;:…—]+/, ''))
+            if @options[:smarthashtags] && @tags.include?(hashtag_proto) && (@used_text_length + word.length + 1) <= (@available_text_length + bonus_for_hashtag_in_text(hashtag_proto))
+                                           #our word can become hashtag                          #after cleaning some space this newborn hashtag will fit
+              word = word.gsub(/\A([«("]*)[#]*/,'\1#')
+              @tags.delete(hashtag_proto)                 #remove hashtag from tags array
+              @available_text_length += bonus_for_hashtag_in_text(hashtag_proto) #…and add some space for text if it was used
+              became_hashtag = true
+            end
+            if need_shrtfy_this_text
+              word = word.gsub /["«».,;:…—]+/, ''
+              unless became_hashtag
+                word_capitalized = Unicode::upcase(word.chr) == word.chr
+                word.gsub! /!+1*(стоодиннадцать|одиннадцать|один|адыннадцать|адынацать|адын|thousand|hundred|eleven|one)*\z/, '!'
+                word.gsub! /(.)\1+/, '\1'
+                word.gsub! /[аеиоуыэюяьъ]+([^ \).,;:…!?»-])/i, '\1'  if word.length > 3
+                word = "#{Unicode::upcase(word.chr)}#{word[1..-1]}" if word_capitalized
+              end
+            end
+            word_length = word.length
+          end
+
+          next if word_length == 0
+
+          break unless try_add_to_tweet(word, word_length)
+        end
+
+        @available_text_length = 140
+
+        try_add_to_tweet(link, 20) if @options[:addlink] == "always"
+        @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet(t)} if @options[:addhashtags] == "always"
+        try_add_to_tweet(link, 20) if @options[:addlink] == "if-possible"
+        @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet(t)} if @options[:addhashtags] == "if-possible"
+
+        @tweet.join(' ')
       end
     end.reject(&:nil?)
   end
 
-  def create_tweet(item)
-    tweet_real_length = 0
-    tweet = []
-
-    item.split(' ').each do |word|
-      if word.start_with? 'http'
-        word_length = 20
-      else
-        word_capitalized = Unicode::upcase(word.chr) == word.chr
-        word = word.gsub /[аеиоуыэюяьъ]+([^ \).,;:…!?»-])/i, '\1'  if word.length > 3
-        word = word.gsub /["«».,;:…—-]+/, ''
-        word_length = word.length
-        word = "#{Unicode::upcase(word.chr)}#{word[1..-1]}" if word_capitalized
-      end
-
-      next if word_length == 0
-
-      if (tweet_real_length + word_length) <= 140
-        tweet_real_length += word_length + 1
-        tweet<< word
-      else
-        break
-      end
-    end
-
-    tweet.join(" ")
-  end
-
   def run!
     while true do
-      parse_rss.map { |item| create_tweet(item) }.each do |tweet|
-        puts tweet
+      parse_rss.each do |tweet|
+        puts "#{tweet}"
 
         if Twitter.update(tweet)
           @last_post_time = DateTime.now
@@ -154,28 +190,35 @@ optparse = OptionParser.new do |opts|
     options[:rssurl] = f
   end
 
-  opts.on( '-i', '--check-interval SECONDS', "Check interval in seconds, default 900 (15 min)" ) do |f|
-    options[:checkinterval] = f.to_i
+  opts.on( '-i', '--check-interval SECONDS', Integer, "Check interval in seconds, default 900 (15 min)" ) do |f|
+    options[:checkinterval] = f
   end
 
   opts.on( '-s', '--shrtfy STRING', 'Shrtfy post text? May be "always" (default), "never" or "if-needed"' ) do |f|
     options[:shrtfy] = f
   end
 
+  opts.on( '-n', '--norepost-tags tag1,tag2,…', Array, 'Juick posts with this tags will not be reposted. Default: "notwi"') do |f|
+    options[:noreposttags] = f
+  end
+
   opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "always", "never" (default) of "if-possible"') do |f|
     options[:addhashtags] = f
   end
 
-  opts.on( '-n', '--norepost-tag STRING', 'Special juick tag for no repost. Default: notwi') do |f|
-    options[:noreposttag] = f
+  opts.on(       '--not-this-tags tag1,tag2,…', Array, 'List of tags which you dont want use as hashtags') do |f|
+    options[:notthistags] = f
   end
 
+  opts.on(       '--[no-]smart-hashtags', 'If possible, convert words in post to respective hashtags. Default: true') do |f|
+    options[:smarthashtags] = f
+  end
 
 end
 
 optparse.parse!
 
-Process.daemon(false,1)
+Process.daemon(false,true)
 
 j2t = Jck2Twtr.new(options)
 j2t.run!
