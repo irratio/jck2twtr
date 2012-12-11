@@ -10,6 +10,7 @@ require "unicode"
 require "yaml"
 require "optparse"
 require "date"
+$VERBOSE = false
 
 class Jck2Twtr
   def default_options
@@ -18,6 +19,7 @@ class Jck2Twtr
       checkinterval: 900,
       postsonstart: 0,
       noreposttags: %w(notwi),
+      linkstags: %w(links pics),
       addhashtags: "never",
       notthistags: [],
       smarthashtags: true,
@@ -104,6 +106,11 @@ class Jck2Twtr
         next unless (@tags & @options[:noreposttags]).empty?
         @tags = @tags - @options[:notthistags]
 
+        is_links_type = ! (@tags & @options[:linkstags]).empty?
+        @tags = @tags - @options[:linkstags]
+
+        link = '' if is_links_type
+
         #puts ":#{link} #{media} #{text} #{@tags.map {|t| "#"+t}.join(' ')}"
 
         text = "#{media} #{text}"
@@ -127,9 +134,11 @@ class Jck2Twtr
           end
         end
 
-        @available_text_length -= 21 if @options[:addlink] == "always"
+        @available_text_length -= 21 if (@options[:addlink] == "always") && ! is_links_type
         @available_text_length -= @tags.inject(0){|total, t| total + t.length + 2} if @options[:addhashtags] == "always"
         need_shrtfy_this_text = (@options[:shrtfy] == "always" || (@options[:shrtfy] == "if-needed" && text.gsub(/http[^ ]*/, 'h'*20).length > @available_text_length))
+
+        wrds= {"бы" => "б", "же" => "ж", "да" => "д"}
 
         text.split(' ').each do |word|
           became_hashtag = false
@@ -150,7 +159,10 @@ class Jck2Twtr
                 word_capitalized = Unicode::upcase(word.chr) == word.chr
                 word.gsub! /!+1*(стоодиннадцать|одиннадцать|один|адыннадцать|адынацать|адын|thousand|hundred|eleven|one)*\z/, '!'
                 word.gsub! /(.)\1+/, '\1'
-                word.gsub! /[аеиоуыэюяьъ]+([^ \).,;:…!?»-])/i, '\1'  if word.length > 3
+                word.gsub! /([^\Aьъ])[еюя]([^ \).,;:…!?»-])/i, '\1\2'  if word.length > 3
+                word.gsub! /[аиоуыэьъ]+([^ \).,;:…!?»-])/i, '\1'  if word.length > 3
+                word.gsub! /[-]/, ''
+                word = wrds[word] if wrds.include?(word)
                 word = "#{Unicode::upcase(word.chr)}#{word[1..-1]}" if word_capitalized
               end
             end
@@ -238,16 +250,30 @@ optparse = OptionParser.new do |opts|
     options[:noreposttags] = f
   end
 
-  opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "always", "never" (default) of "if-possible"') do |f|
+  opts.on(       '--links-tags tag1,tag2,…', Array, '"Links-type" tags. Default: "links,pics"') do |f|
+    options[:linkstags] = f
+  end
+
+  opts.on( '-l', '--add-link STRING', 'Add link to post on juick. May be "always" (default, except links-type posts), "never" or "if-possible".' ) do |f|
+    options[:addlink] = f
+  end
+
+  opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "always", "never" (default), "if-possible" or "only-smart-hashtags"') do |f|
     options[:addhashtags] = f
   end
 
-  opts.on(       '--not-this-tags tag1,tag2,…', Array, 'List of tags which you dont want use as hashtags') do |f|
+  opts.on(       '--not-this-tags tag1,tag2,…', Array, "List of tags, which you don't want use as hashtags" ) do |f|
     options[:notthistags] = f
   end
 
   opts.on(       '--[no-]smart-hashtags', 'If possible, convert words in post to respective hashtags. Default: true') do |f|
     options[:smarthashtags] = f
+  end
+
+  opts.on(       '--test', 'Combination of -j -1 -p 100' ) do |f|
+    options[:justshow] = true
+    options[:oneshot] = true
+    options[:postsonstart] = 100
   end
 
 end
@@ -259,7 +285,7 @@ end
 
 optparse.parse!
 
-Process.daemon(true,true) unless options[:justshow]
+Process.daemon(true,false) unless options[:justshow]
 
 j2t = Jck2Twtr.new(options)
 j2t.run!
