@@ -1,4 +1,6 @@
+#!/usr/bin/env ruby
 # coding: utf-8
+$VERBOSE = nil
 require "rubygems"
 require "bundler/setup"
 require "nokogiri"
@@ -14,6 +16,7 @@ class Jck2Twtr
     {
       configfile: "config.yml",
       checkinterval: 900,
+      postsonstart: 0,
       noreposttags: %w(notwi),
       addhashtags: "never",
       notthistags: [],
@@ -24,8 +27,6 @@ class Jck2Twtr
   end
 
   def initialize(options = {})
-    @last_post_time = DateTime.now
-
     @options = default_options
     @options[:configfile] = options[:configfile] if options.has_key?(:configfile)
 
@@ -45,6 +46,8 @@ class Jck2Twtr
 
     @options[:smarthashtags] = false if (@options[:addhashtags] == "never")
 
+    @options[:postsonstart] = 1 if @options[:oneshot] && @options[:postsonstart] == 0
+
     Twitter.configure do |config|
       config_file['twitter'].each do |key, value|
         config.instance_variable_set("@#{key}", value)
@@ -52,19 +55,36 @@ class Jck2Twtr
     end
 
     unless @options.include? :rssurl
-      puts "RSS URL is not set"
-      exit 128
+      warn "RSS URL is not set"
+      exit 1
     end
+
+    begin
+      doc = Nokogiri::XML(open(@options[:rssurl]))
+      @old_items_guids = doc.css('item').map{|i| i.css('guid').text}.drop(@options[:postsonstart])
+    rescue Exception => e
+      warn "Can't fetch and parse #{@options[:rssurl]}: #{e.message}"
+      exit 2
+    end
+
   end
 
   def parse_rss
-    doc = Nokogiri::XML(open(@options[:rssurl]))
-    items = doc.css('item')
+    begin
+      doc = Nokogiri::XML(open(@options[:rssurl]))
+      items = doc.css('item').reverse
+    rescue Exception => e
+      warn "Can't fetch #{@options[:rssurl]}: #{e.message}"
+      return []
+    end
 
     items.map do |item|
-      if DateTime.parse(item.css('pubDate').text) < @last_post_time
+      if @old_items_guids.include?(item.css('guid').text)
         nil
       else
+        @old_items_guids.insert(0,item.css('guid').text)
+        @old_items_guids.slice!(50,50)
+
         description = Nokogiri::HTML(item.css('description').text)
 
         description.css('a').each do |a|
@@ -139,7 +159,7 @@ class Jck2Twtr
 
           next if word_length == 0
 
-          break unless try_add_to_tweet(word, word_length)
+          try_add_to_tweet(word, word_length) or break
         end
 
         @available_text_length = 140
@@ -155,14 +175,19 @@ class Jck2Twtr
   end
 
   def run!
-    while true do
+    @twitter_queue = []
+    loop do
       parse_rss.each do |tweet|
-        puts "#{tweet}"
-
-        if Twitter.update(tweet)
-          @last_post_time = DateTime.now
+        if @options[:justshow]
+          puts "#{tweet}"
+        else
+          @twitter_queue.push(tweet)
         end
       end
+      @twitter_queue.reject! do |tweet|
+        #Twitter.update(tweet)
+      end
+      break if @options[:oneshot]
       sleep(@options[:checkinterval])
     end
   end
@@ -183,7 +208,6 @@ optparse = OptionParser.new do |opts|
 
   opts.on( '-u', '--juick-username USERNAME', "Username on Juick" ) do |f|
     options[:username] = f
-    #options[:rssurl] = "http://rss.juick.com/#{options[:username]}/blog"
   end
 
   opts.on( '-r', '--rss-url URL', "RSS URL to parse (default: http://rss.juick.com/USERNAME/blog)" ) do |f|
@@ -192,6 +216,18 @@ optparse = OptionParser.new do |opts|
 
   opts.on( '-i', '--check-interval SECONDS', Integer, "Check interval in seconds, default 900 (15 min)" ) do |f|
     options[:checkinterval] = f
+  end
+
+  opts.on( '-p', '--posts-on-start NUM', Integer, "Proceed NUM posts immediately" ) do |f|
+    options[:postsonstart] = f
+  end
+
+  opts.on( '-j', '--[no-]just-show', "Don't post to twitter, just put them to STDOUT. Also, jck2twtr wouldn't daemonize" ) do |f|
+    options[:justshow] = f
+  end
+
+  opts.on( '-1', '--one-shot', "Exit after first rss fetch. Implies -p 1" ) do |f|
+    options[:oneshot] = f
   end
 
   opts.on( '-s', '--shrtfy STRING', 'Shrtfy post text? May be "always" (default), "never" or "if-needed"' ) do |f|
@@ -216,9 +252,14 @@ optparse = OptionParser.new do |opts|
 
 end
 
+trap("INT") do
+  puts "Shutting down…"
+  exit
+end
+
 optparse.parse!
 
-Process.daemon(false,true)
+Process.daemon(true,true) unless options[:justshow]
 
 j2t = Jck2Twtr.new(options)
 j2t.run!
