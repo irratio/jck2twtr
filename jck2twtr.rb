@@ -185,7 +185,7 @@ class Jck2Twtr
         end
       end
       @twitter_queue.reject! do |tweet|
-        #Twitter.update(tweet)
+        Twitter.update(tweet)
       end
       break if @options[:oneshot]
       sleep(@options[:checkinterval])
