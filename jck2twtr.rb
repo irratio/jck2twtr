@@ -74,7 +74,7 @@ class Jck2Twtr
   def parse_rss
     begin
       doc = Nokogiri::XML(open(@options[:rssurl]))
-      items = doc.css('item').reverse
+      items = doc.css('item')
     rescue Exception => e
       warn "Can't fetch #{@options[:rssurl]}: #{e.message}"
       return []
@@ -137,6 +137,7 @@ class Jck2Twtr
         @available_text_length -= 21 if (@options[:addlink] == "always") && ! is_links_type
         @available_text_length -= @tags.inject(0){|total, t| total + t.length + 2} if @options[:addhashtags] == "always"
         need_shrtfy_this_text = (@options[:shrtfy] == "always" || (@options[:shrtfy] == "if-needed" && text.gsub(/http[^ ]*/, 'h'*20).length > @available_text_length))
+        @available_text_length -= 21 if (@options[:addlink] == "if-shrtfd") && need_shrtfy_this_text
 
         wrds= {"бы" => "б", "же" => "ж", "да" => "д"}
 
@@ -176,7 +177,7 @@ class Jck2Twtr
 
         @available_text_length = 140
 
-        try_add_to_tweet(link, 20) if @options[:addlink] == "always"
+        try_add_to_tweet(link, 20) if @options[:addlink] == "always" || (@options[:addlink] == "if-shrtfd" && need_shrtfy_this_text)
         @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet(t)} if @options[:addhashtags] == "always"
         try_add_to_tweet(link, 20) if @options[:addlink] == "if-possible"
         @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet(t)} if @options[:addhashtags] == "if-possible"
@@ -189,7 +190,7 @@ class Jck2Twtr
   def run!
     @twitter_queue = []
     loop do
-      parse_rss.each do |tweet|
+      parse_rss.reverse.each do |tweet|
         if @options[:justshow]
           puts "#{tweet}"
         else
