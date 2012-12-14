@@ -98,7 +98,7 @@ class Jck2Twtr
         end
 
         media = (item.xpath('media:content').first || {})['url']
-        text = description.xpath("//text()").to_s
+        text = description.xpath("//text()").text
         link = item.css('link').text
 
         @tags = []
