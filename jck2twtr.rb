@@ -80,6 +80,17 @@ class Jck2Twtr
       return []
     end
 
+    try_add_to_tweet = lambda do |s, l=s.length|
+      return true if s.empty?
+      if (@used_text_length + l) <= @available_text_length
+        @used_text_length += l + 1
+        @tweet << s
+        true
+      else
+        false
+      end
+    end
+
     items.map do |item|
       if @old_items_guids.include?(item.css('guid').text)
         nil
@@ -124,17 +135,6 @@ class Jck2Twtr
         @used_text_length = 0
         @tweet = []
 
-        def try_add_to_tweet(s, l=s.length)
-          return true if s == ''
-          if (@used_text_length + l) <= @available_text_length
-            @used_text_length += l + 1
-            @tweet << s
-            true
-          else
-            false
-          end
-        end
-
         @available_text_length -= 21 if (@options[:addlink] == "always") && ! is_links_type
         @available_text_length -= @tags.inject(0){|total, t| total + t.length + 2} if @options[:addhashtags] == "always"
         need_shrtfy_this_text = (@options[:shrtfy] == "always" || (@options[:shrtfy] == "if-needed" && text.gsub(/http[^ ]*/, 'h'*20).length > @available_text_length))
@@ -175,15 +175,15 @@ class Jck2Twtr
 
           next if word_length == 0
 
-          try_add_to_tweet(word, word_length) or break
+          try_add_to_tweet.call(word, word_length) or break
         end
 
         @available_text_length = 140
 
-        try_add_to_tweet(link, 20) if @options[:addlink] == "always" || (@options[:addlink] == "if-shrtfd" && need_shrtfy_this_text)
-        @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet(t)} if @options[:addhashtags] == "always"
-        try_add_to_tweet(link, 20) if @options[:addlink] == "if-possible"
-        @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet(t)} if @options[:addhashtags] == "if-possible"
+        try_add_to_tweet.call(link, 20) if @options[:addlink] == "always" || (@options[:addlink] == "if-shrtfd" && need_shrtfy_this_text)
+        @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet.call(t)} if @options[:addhashtags] == "always"
+        try_add_to_tweet.call(link, 20) if @options[:addlink] == "if-possible"
+        @tags.map{|t| "#"+t}.each{|t| try_add_to_tweet.call(t)} if @options[:addhashtags] == "if-possible"
 
         @tweet.join(' ')
       end
