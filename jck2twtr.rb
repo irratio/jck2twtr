@@ -20,11 +20,11 @@ class Jck2Twtr
       postsonstart: 0,
       noreposttags: %w(notwi),
       linkstags: %w(links pics),
-      addhashtags: "never",
+      addhashtags: :never,
       notthistags: [],
       smarthashtags: true,
-      addlink: "always",
-      shrtfy: "always"
+      addlink: :always,
+      shrtfy: :always
     }
   end
 
@@ -46,7 +46,7 @@ class Jck2Twtr
     @options[:checkinterval] = @options[:checkinterval].to_i
     # just in case
 
-    @options[:smarthashtags] = false if (@options[:addhashtags] == "never")
+    @options[:smarthashtags] = false if (@options[:addhashtags] == :never)
 
     @options[:postsonstart] = 1 if @options[:oneshot] && @options[:postsonstart] == 0
 
@@ -166,10 +166,10 @@ class Jck2Twtr
         used_text_length = 0
         tweet = []
 
-        available_text_length -= 21 if (@options[:addlink] == "always") && ! is_links_type
-        available_text_length -= tags.inject(0){|total, t| total + t.length + 2} if @options[:addhashtags] == "always"
-        need_shrtfy_this_text = (@options[:shrtfy] == "always" || (@options[:shrtfy] == "if-needed" && text.gsub(/http[^ ]*/, 'h'*20).length > available_text_length))
-        available_text_length -= 21 if (@options[:addlink] == "if-shrtfd") && need_shrtfy_this_text
+        available_text_length -= 21 if (@options[:addlink] == :always) && ! is_links_type
+        available_text_length -= tags.inject(0){|total, t| total + t.length + 2} if @options[:addhashtags] == :always
+        need_shrtfy_this_text = (@options[:shrtfy] == :always || (@options[:shrtfy] == :"if-needed" && text.gsub(/http[^ ]*/, 'h'*20).length > available_text_length))
+        available_text_length -= 21 if (@options[:addlink] == :"if-shrtfd") && need_shrtfy_this_text
 
         wrds= {"бы" => "б", "же" => "ж", "да" => "д"}
 
@@ -179,7 +179,7 @@ class Jck2Twtr
             word_length = 20
           else
             hashtag_proto = Unicode::downcase(word.gsub(/["()«».,;:…—]+/, ''))
-            bonus_for_hashtag_in_text = @options[:addhashtags] == "always" ? hashtag_proto.length + 2 : 0
+            bonus_for_hashtag_in_text = @options[:addhashtags] == :always ? hashtag_proto.length + 2 : 0
             if @options[:smarthashtags] && tags.include?(hashtag_proto) && (used_text_length + word.length + 1) <= (available_text_length + bonus_for_hashtag_in_text)
                                            #our word can become hashtag && after cleaning some space this newborn hashtag will fit
               word = word.gsub(/\A([«("]*)[#]*/,'\1#')
@@ -211,10 +211,10 @@ class Jck2Twtr
 
         available_text_length = 140
 
-        try_add_to_tweet.call(link, 20) if @options[:addlink] == "always" || (@options[:addlink] == "if-shrtfd" && need_shrtfy_this_text)
-        tags.map{|t| "#"+t}.each{|t| try_add_to_tweet.call(t)} if @options[:addhashtags] == "always"
-        try_add_to_tweet.call(link, 20) if @options[:addlink] == "if-possible"
-        tags.map{|t| "#"+t}.each{|t| try_add_to_tweet.call(t)} if @options[:addhashtags] == "if-possible"
+        try_add_to_tweet.call(link, 20) if @options[:addlink] == :always || (@options[:addlink] == :"if-shrtfd" && need_shrtfy_this_text)
+        tags.map{|t| "#"+t}.each{|t| try_add_to_tweet.call(t)} if @options[:addhashtags] == :always
+        try_add_to_tweet.call(link, 20) if @options[:addlink] == :"if-possible"
+        tags.map{|t| "#"+t}.each{|t| try_add_to_tweet.call(t)} if @options[:addhashtags] == :"if-possible"
 
         tweet.join(' ')
       end
@@ -293,7 +293,7 @@ optparse = OptionParser.new do |opts|
     options[:linkstags] = f
   end
 
-  opts.on( '-l', '--add-link STRING', 'Add link to post on juick. May be "always" (default, except links-type posts), "never" or "if-possible".' ) do |f|
+  opts.on( '-l', '--add-link STRING', 'Add link to post on juick. May be "always" (default, except links-type posts), "never", "if-possible" or "if-shrtfd".' ) do |f|
     options[:addlink] = f
   end
 
