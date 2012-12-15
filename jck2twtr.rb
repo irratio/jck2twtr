@@ -107,7 +107,7 @@ class Jck2Twtr
         link = item.css('link').text
 
         @tags = []
-        @tags = item.css('category').map{|c| Unicode::downcase(c.text)}
+        @tags = item.css('category').map{|c| Unicode::downcase(c.text).gsub('-','')}
         next unless (@tags & @options[:noreposttags]).empty?
         @tags = @tags - @options[:notthistags]
 
