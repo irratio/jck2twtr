@@ -51,26 +51,33 @@ class Jck2Twtr
     @options[:postsonstart] = 1 if @options[:oneshot] && @options[:postsonstart] == 0
 
     @twitter = Twitter::Client.new(config_file['twitter'])
-    begin
-      @twitter.verify_credentials
-    rescue Exception => e
-      warn "Can't connect to twitter: #{e.message}"
-      exit 2
-    end
+    @twitter_queue = []
 
     unless @options.include? :rssurl
       warn "RSS URL is not set"
       exit 1
     end
 
+    @old_items_guids = []
+  end
+
+  def connected?
     begin
       doc = Nokogiri::XML(open(@options[:rssurl]))
       @old_items_guids = doc.css('item').map{|i| i.css('guid').text}.drop(@options[:postsonstart])
     rescue Exception => e
       warn "Can't fetch and parse #{@options[:rssurl]}: #{e.message}"
-      exit 2
+      return false
     end
 
+    begin
+      @twitter.verify_credentials
+    rescue Exception => e
+      warn "Can't connect to twitter: #{e.message}"
+      return false
+    end
+
+    true
   end
 
   def save_config
@@ -215,7 +222,7 @@ class Jck2Twtr
   end
 
   def run!
-    @twitter_queue = []
+    connected? or exit 2
     loop do
       parse_rss.reverse.each do |tweet|
         if @options[:justshow]
