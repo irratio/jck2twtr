@@ -97,6 +97,11 @@ class Jck2Twtr
           br.replace(' ')
         end
 
+        description.css('blockquote').each do |bq|
+          #puts bq.methods
+          bq.replace("«#{bq.text}»")
+        end
+
         media = (item.xpath('media:content').first || {})['url']
         text = description.xpath("//text()").text
         link = item.css('link').text
@@ -155,13 +160,14 @@ class Jck2Twtr
               became_hashtag = true
             end
             if need_shrtfy_this_text
-              word = word.gsub /["«».,;:…—]+/, ''
+              word = word.gsub /[".,;:…—]+/, ''
               unless became_hashtag
                 word_capitalized = Unicode::upcase(word.chr) == word.chr
                 word.gsub! /!+1*(стоодиннадцать|одиннадцать|один|адыннадцать|адынацать|адын|thousand|hundred|eleven|one)*\z/, '!'
-                word.gsub! /(.)\1+/, '\1'
+                word.gsub! /([^0-9])\1+/, '\1'
                 word.gsub! /([^\Aьъ])[еюя]([^ \).,;:…!?»-])/i, '\1\2'  if word.length > 3
                 word.gsub! /[аиоуыэьъ]+([^ \).,;:…!?»-])/i, '\1'  if word.length > 3
+                word.gsub! /[aeiouy]+([^ \).,;:…!?»-])/i, '\1' if word.length > 3
                 word.gsub! /[-]/, ''
                 word = wrds[word] if wrds.include?(word)
                 word = "#{Unicode::upcase(word.chr)}#{word[1..-1]}" if word_capitalized
