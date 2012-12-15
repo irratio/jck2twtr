@@ -113,7 +113,6 @@ class Jck2Twtr
         end
 
         description.css('blockquote').each do |bq|
-          #puts bq.methods
           bq.replace("«#{bq.text}»")
         end
 
@@ -129,8 +128,6 @@ class Jck2Twtr
         tags = tags - @options[:linkstags]
 
         link = '' if is_links_type
-
-        #puts ":#{link} #{media} #{text} #{tags.map {|t| "#"+t}.join(' ')}"
 
         text = "#{media} #{text}"
 
@@ -153,9 +150,9 @@ class Jck2Twtr
             hashtag_proto = Unicode::downcase(word.gsub(/["()«».,;:…—]+/, ''))
             bonus_for_hashtag_in_text = @options[:addhashtags] == "always" ? hashtag_proto.length + 2 : 0
             if @options[:smarthashtags] && tags.include?(hashtag_proto) && (used_text_length + word.length + 1) <= (available_text_length + bonus_for_hashtag_in_text)
-                                           #our word can become hashtag                          #after cleaning some space this newborn hashtag will fit
+                                           #our word can become hashtag && after cleaning some space this newborn hashtag will fit
               word = word.gsub(/\A([«("]*)[#]*/,'\1#')
-              tags.delete(hashtag_proto)                 #remove hashtag from tags array
+              tags.delete(hashtag_proto)                         #remove hashtag from tags array
               available_text_length += bonus_for_hashtag_in_text #…and add some space for text if it was used
               became_hashtag = true
             end
