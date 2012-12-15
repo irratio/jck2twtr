@@ -124,10 +124,6 @@ class Jck2Twtr
         @used_text_length = 0
         @tweet = []
 
-        def bonus_for_hashtag_in_text(w)
-          @options[:addhashtags] == "always" ? w.length + 2 : 0
-        end
-
         def try_add_to_tweet(s, l=s.length)
           return true if s == ''
           if (@used_text_length + l) <= @available_text_length
@@ -152,11 +148,12 @@ class Jck2Twtr
             word_length = 20
           else
             hashtag_proto = Unicode::downcase(word.gsub(/["()«».,;:…—]+/, ''))
-            if @options[:smarthashtags] && @tags.include?(hashtag_proto) && (@used_text_length + word.length + 1) <= (@available_text_length + bonus_for_hashtag_in_text(hashtag_proto))
+            bonus_for_hashtag_in_text = @options[:addhashtags] == "always" ? hashtag_proto.length + 2 : 0
+            if @options[:smarthashtags] && @tags.include?(hashtag_proto) && (@used_text_length + word.length + 1) <= (@available_text_length + bonus_for_hashtag_in_text)
                                            #our word can become hashtag                          #after cleaning some space this newborn hashtag will fit
               word = word.gsub(/\A([«("]*)[#]*/,'\1#')
               @tags.delete(hashtag_proto)                 #remove hashtag from tags array
-              @available_text_length += bonus_for_hashtag_in_text(hashtag_proto) #…and add some space for text if it was used
+              @available_text_length += bonus_for_hashtag_in_text #…and add some space for text if it was used
               became_hashtag = true
             end
             if need_shrtfy_this_text
