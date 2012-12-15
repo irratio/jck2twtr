@@ -50,10 +50,12 @@ class Jck2Twtr
 
     @options[:postsonstart] = 1 if @options[:oneshot] && @options[:postsonstart] == 0
 
-    Twitter.configure do |config|
-      config_file['twitter'].each do |key, value|
-        config.instance_variable_set("@#{key}", value)
-      end
+    @twitter = Twitter::Client.new(config_file['twitter'])
+    begin
+      @twitter.verify_credentials
+    rescue Exception => e
+      warn "Can't connect to twitter: #{e.message}"
+      exit 2
     end
 
     unless @options.include? :rssurl
@@ -69,6 +71,27 @@ class Jck2Twtr
       exit 2
     end
 
+  end
+
+  def save_config
+    config_file_path = @options[:saveconfig].empty? ? "co" + @options[:configfile] : @options[:saveconfig]
+
+    config = {"twitter"=>Hash[ [:consumer_key,
+                                :consumer_secret,
+                                :oauth_token,
+                                :oauth_token_secret].collect{|v| [v, @twitter.instance_variable_get("@#{v}")]} ],
+              "main"=> @options}
+    config["main"].delete(:configfile)
+    config["main"].delete(:saveconfig)
+
+    begin
+      File.open(config_file_path, "w") do |file|
+        YAML.dump(config, file)
+      end
+    rescue Exception => e
+      warn "Can't save config file to #{config_file_path}: #{e.message}"
+      exit 2
+    end
   end
 
   def parse_rss
@@ -223,6 +246,10 @@ optparse = OptionParser.new do |opts|
     options[:configfile] = f
   end
 
+  opts.on(       '--save-config [FILE]', 'Save given options to config file and exit' ) do |f|
+    options[:saveconfig] = f || ''
+  end
+
   opts.on( '-u', '--juick-username USERNAME', "Username on Juick" ) do |f|
     options[:username] = f
   end
@@ -290,7 +317,11 @@ end
 
 optparse.parse!
 
-Process.daemon(true,false) unless options[:justshow]
-
 j2t = Jck2Twtr.new(options)
-j2t.run!
+if options[:saveconfig]
+  j2t.save_config
+else
+  j2t.run!
+end
+
+Process.daemon(true,false) unless options[:justshow]
