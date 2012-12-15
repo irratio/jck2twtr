@@ -130,6 +130,7 @@ class Jck2Twtr
         link = '' if is_links_type
 
         text = "#{media} #{text}"
+        text.gsub! /[.]{2,}/, '…'
 
         available_text_length = 140
         used_text_length = 0
