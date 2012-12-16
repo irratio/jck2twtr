@@ -32,10 +32,14 @@ class Jck2Twtr
     @options = default_options
     @options[:configfile] = options[:configfile] if options.has_key?(:configfile)
 
-    config_file = YAML.load_file(@options[:configfile])
-
-    @options.merge!(config_file[:main].inject({}){|resulthash,(k,v)| resulthash[k.to_sym] = v; resulthash})
-    # reading options from config file, converting string keys to symbols in process
+    begin
+      config_file = YAML.load_file(@options[:configfile])
+      @options.merge!(config_file[:main].inject({}){|resulthash,(k,v)| resulthash[k.to_sym] = v; resulthash})
+      # reading options from config file, converting string keys to symbols in process
+      @twitter = Twitter::Client.new(config_file[:twitter])
+    rescue Exception => e
+      warn "Can't load config file from #{@options[:configfile]}: #{e.message}"
+    end
 
     @options.merge!(options)
 
@@ -50,7 +54,6 @@ class Jck2Twtr
 
     @options[:postsonstart] = 1 if @options[:oneshot] && @options[:postsonstart] == 0
 
-    @twitter = Twitter::Client.new(config_file[:twitter])
     @twitter_queue = []
 
     unless @options.include? :rssurl
@@ -232,7 +235,7 @@ class Jck2Twtr
         end
       end
       @twitter_queue.reject! do |tweet|
-        Twitter.update(tweet)
+        @twitter.update(tweet)
       end
       break if @options[:oneshot]
       sleep(@options[:checkinterval])
@@ -336,6 +339,8 @@ rescue OptionParser::ParseError => e
   exit 1
 end
 
+Process.daemon(true,false) unless options[:justshow]
+
 j2t = Jck2Twtr.new(options)
 if options[:saveconfig]
   j2t.save_config
@@ -343,4 +348,3 @@ else
   j2t.run!
 end
 
-Process.daemon(true,false) unless options[:justshow]
