@@ -81,7 +81,7 @@ class Jck2Twtr
   end
 
   def save_config
-    config_file_path = @options[:saveconfig].empty? ? "co" + @options[:configfile] : @options[:saveconfig]
+    config_file_path = @options[:saveconfig].to_s.empty? ? @options[:configfile] : @options[:saveconfig]
 
     config = {"twitter"=>Hash[ [:consumer_key,
                                 :consumer_secret,
@@ -281,7 +281,7 @@ optparse = OptionParser.new do |opts|
     options[:oneshot] = f
   end
 
-  opts.on( '-s', '--shrtfy STRING', 'Shrtfy post text? May be "always" (default), "never" or "if-needed"' ) do |f|
+  opts.on( '-s', '--shrtfy STRING', [:always, :never, :"if-needed"], 'Shrtfy post text? May be "always" (default), "never" or "if-needed"' ) do |f|
     options[:shrtfy] = f
   end
 
@@ -293,11 +293,11 @@ optparse = OptionParser.new do |opts|
     options[:linkstags] = f
   end
 
-  opts.on( '-l', '--add-link STRING', 'Add link to post on juick. May be "always" (default, except links-type posts), "never", "if-possible" or "if-shrtfd".' ) do |f|
+  opts.on( '-l', '--add-link STRING', [:always, :never, :"if-possible", :"if-shrtfd"], 'Add link to original juick post? May be "always" (default, except links-type posts), "never", "if-possible" or "if-shrtfd".' ) do |f|
     options[:addlink] = f
   end
 
-  opts.on( '-t', '--add-hashtags STRING', 'Convert juick tags to twitter hashtags? May be "always", "never" (default), "if-possible" or "only-smart-hashtags"') do |f|
+  opts.on( '-t', '--add-hashtags STRING', [:always, :never, :"if-possible", :"only-smart-hashtags"], 'Convert juick tags to twitter hashtags? May be "always", "never" (default), "if-possible" or "only-smart-hashtags"') do |f|
     options[:addhashtags] = f
   end
 
