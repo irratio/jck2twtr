@@ -243,17 +243,19 @@ end
 
 options = {}
 optparse = OptionParser.new do |opts|
-  opts.banner = "Usage: jck2twtr [-h] [-c] [-u] [-r]"
-  opts.on( '-h', '--help', 'Display this screen' ) do
+  opts.banner = "Program for reposting from juick to twitter with some text conversions\n" +
+                "Usage: jck2twtr [-c CONFIGFILE] [-u USERNAME] [OPTIONS]"
+  opts.set_summary_indent("  ")
+  opts.on( '-h', '--help', 'display this screen' ) do
     puts opts
     exit
   end
 
-  opts.on( '-c', '--config FILE', "Config file" ) do |f|
+  opts.on( '-c', '--config FILE', "path to config file" ) do |f|
     options[:configfile] = f
   end
 
-  opts.on(       '--save-config [FILE]', 'Save given options to config file and exit' ) do |f|
+  opts.on(       '--save-config [FILE]', 'save given options to config file and exit' ) do |f|
     options[:saveconfig] = f || ''
   end
 
@@ -261,55 +263,60 @@ optparse = OptionParser.new do |opts|
     options[:username] = f
   end
 
-  opts.on( '-r', '--rss-url URL', "RSS URL to parse (default: http://rss.juick.com/USERNAME/blog)" ) do |f|
+  opts.on( '-r', '--rss-url URL', "RSS URL (default: http://rss.juick.com/USERNAME/blog)" ) do |f|
     options[:rssurl] = f
   end
 
-  opts.on( '-i', '--check-interval SECONDS', Integer, "Check interval in seconds, default 900 (15 min)" ) do |f|
+  opts.on( '-i', '--check-interval SECONDS', Integer, "check interval in seconds, default 900 (15 min)" ) do |f|
     options[:checkinterval] = f
   end
 
-  opts.on( '-p', '--posts-on-start NUM', Integer, "Proceed NUM posts immediately" ) do |f|
+  opts.on( '-p', '--posts-on-start NUM', Integer, 'proceed NUM posts immediately',
+           '(by default, all "old" posts are discarded)' ) do |f|
     options[:postsonstart] = f
   end
 
-  opts.on( '-j', '--[no-]just-show', "Don't post to twitter, just put them to STDOUT. Also, jck2twtr wouldn't daemonize" ) do |f|
+  opts.on( '-j', '--[no-]just-show', "don't post to twitter, just print to STDOUT.",
+           "also, jck2twtr wouldn't daemonize" ) do |f|
     options[:justshow] = f
   end
 
-  opts.on( '-1', '--one-shot', "Exit after first rss fetch. Implies -p 1" ) do |f|
+  opts.on( '-1', '--one-shot', "exit after first rss fetch, implies -p 1" ) do |f|
     options[:oneshot] = f
   end
 
-  opts.on( '-s', '--shrtfy STRING', [:always, :never, :"if-needed"], 'Shrtfy post text? May be "always" (default), "never" or "if-needed"' ) do |f|
+  opts.on( '-s', '--shrtfy STRING', [:always, :never, :"if-needed"], 'shrtfy post text? may be "always" (default), ',
+           '"never" or "if-needed"' ) do |f|
     options[:shrtfy] = f
   end
 
-  opts.on( '-n', '--norepost-tags tag1,tag2,…', Array, 'Juick posts with this tags will not be reposted. Default: "notwi"') do |f|
+  opts.on( '-n', '--norepost-tags tag1,tag2,…', Array, 'juick posts with this tags will not be reposted, default: "notwi"') do |f|
     options[:noreposttags] = f
   end
 
-  opts.on(       '--links-tags tag1,tag2,…', Array, '"Links-type" tags. Default: "links,pics"') do |f|
+  opts.on(       '--links-tags tag1,tag2,…', Array, '"links-type" tags, default: "links,pics"') do |f|
     options[:linkstags] = f
   end
 
-  opts.on( '-l', '--add-link STRING', [:always, :never, :"if-possible", :"if-shrtfd"], 'Add link to original juick post? May be "always" (default, except links-type posts), "never", "if-possible" or "if-shrtfd".' ) do |f|
+  opts.on( '-l', '--add-link STRING', [:always, :never, :"if-possible", :"if-shrtfd"], 'add link to original juick post? may be "always" (default),',
+           '"never", "if-possible" or "if-shrtfd".' ) do |f|
     options[:addlink] = f
   end
 
-  opts.on( '-t', '--add-hashtags STRING', [:always, :never, :"if-possible", :"only-smart-hashtags"], 'Convert juick tags to twitter hashtags? May be "always", "never" (default), "if-possible" or "only-smart-hashtags"') do |f|
+  opts.on( '-t', '--add-hashtags STRING', [:always, :never, :"if-possible", :"only-smart-hashtags"], 'convert juick tags to twitter hashtags? may be "always",',
+           '"never" (default), "if-possible" or "only-smart-hashtags"') do |f|
     options[:addhashtags] = f
   end
 
-  opts.on(       '--not-this-tags tag1,tag2,…', Array, "List of tags, which you don't want use as hashtags" ) do |f|
+  opts.on(       '--not-this-tags tag1,tag2,…', Array, "list of tags which you don't want use as hashtags" ) do |f|
     options[:notthistags] = f
   end
 
-  opts.on(       '--[no-]smart-hashtags', 'If possible, convert words in post to respective hashtags. Default: true') do |f|
+  opts.on(       '--[no-]smart-hashtags', 'if possible, convert words in post to respective hashtags') do |f|
     options[:smarthashtags] = f
   end
 
-  opts.on(       '--test', 'Combination of -j -1 -p 100' ) do |f|
+  opts.on(       '--test', 'combination of -j -1 -p 100' ) do |f|
     options[:justshow] = true
     options[:oneshot] = true
     options[:postsonstart] = 100
