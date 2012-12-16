@@ -322,7 +322,12 @@ trap("INT") do
   exit
 end
 
-optparse.parse!
+begin
+  optparse.parse!
+rescue OptionParser::ParseError => e
+  warn e.message
+  exit 1
+end
 
 j2t = Jck2Twtr.new(options)
 if options[:saveconfig]
