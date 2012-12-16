@@ -34,7 +34,7 @@ class Jck2Twtr
 
     config_file = YAML.load_file(@options[:configfile])
 
-    @options.merge!(config_file['main'].inject({}){|resulthash,(k,v)| resulthash[k.to_sym] = v; resulthash})
+    @options.merge!(config_file[:main].inject({}){|resulthash,(k,v)| resulthash[k.to_sym] = v; resulthash})
     # reading options from config file, converting string keys to symbols in process
 
     @options.merge!(options)
@@ -50,7 +50,7 @@ class Jck2Twtr
 
     @options[:postsonstart] = 1 if @options[:oneshot] && @options[:postsonstart] == 0
 
-    @twitter = Twitter::Client.new(config_file['twitter'])
+    @twitter = Twitter::Client.new(config_file[:twitter])
     @twitter_queue = []
 
     unless @options.include? :rssurl
@@ -83,13 +83,13 @@ class Jck2Twtr
   def save_config
     config_file_path = @options[:saveconfig].to_s.empty? ? @options[:configfile] : @options[:saveconfig]
 
-    config = {"twitter"=>Hash[ [:consumer_key,
+    config = {:twitter=> Hash[ [:consumer_key,
                                 :consumer_secret,
                                 :oauth_token,
                                 :oauth_token_secret].collect{|v| [v, @twitter.instance_variable_get("@#{v}")]} ],
-              "main"=> @options}
-    config["main"].delete(:configfile)
-    config["main"].delete(:saveconfig)
+              :main=> @options}
+    config[:main].delete(:configfile)
+    config[:main].delete(:saveconfig)
 
     begin
       File.open(config_file_path, "w") do |file|
