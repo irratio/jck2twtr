@@ -73,11 +73,13 @@ class Jck2Twtr
       return false
     end
 
-    begin
-      @twitter.verify_credentials
-    rescue Exception => e
-      warn "Can't connect to twitter: #{e.message}"
-      return false
+    unless @options[:justshow]
+      begin
+        @twitter.verify_credentials
+      rescue Exception => e
+        warn "Can't connect to twitter: #{e.message}"
+        return false
+      end
     end
 
     true
